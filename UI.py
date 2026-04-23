@@ -2,93 +2,57 @@ import cv2
 import numpy as np
 from keras.models import load_model
 import streamlit as st
-import pyttsx3
 
-# Load the trained model
+# Load model
 model = load_model("my_model.keras")
 
-# Labels for classes (adjust according to your dataset)
 class_names = ['0', '1', '2', '3', '4', '5', '6']
 
-# Dictionary to map classes to their corresponding message
 class_messages = {
-    '0': "panch rupaiy",
-    '1': "das rupaiya",
-    '2': "bis rupaiya",
-    '3': "pachas rupaiya",
-    '4': "saye rupaiya",
-    '5': "pach saye rupaiya",
-    '6': "ek hajar rupaiya"
+    '0': "Panch Rupaiya",
+    '1': "Das Rupaiya",
+    '2': "Bis Rupaiya",
+    '3': "Pachas Rupaiya",
+    '4': "Saye Rupaiya",
+    '5': "Pach Saye Rupaiya",
+    '6': "Ek Hajar Rupaiya"
 }
 
-# Initialize the pyttsx3 engine for audio output
-engine = pyttsx3.init()
-
-# Function to speak out the recognized class
-def speak_class(class_name):
-    message = class_messages.get(class_name, "Unknown")
-    engine.say(message)
-    engine.runAndWait()
-
-# Function to preprocess the image
 def preprocess_img(img):
-    img = cv2.resize(img, (224, 224))  # Resize to match model input shape
-    img = img / 255.0  # Normalize pixel values
+    img = cv2.resize(img, (224, 224))
+    img = img / 255.0
     return img
 
-# Function to predict class
 def predict_class(img):
     img = preprocess_img(img)
-    img = np.expand_dims(img, axis=0)  # Add batch dimension
-    pred = model.predict(img)[0]  # Perform prediction
-    class_index = np.argmax(pred)  # Get index of predicted class
-    class_name = class_names[class_index]  # Get class name
-    return class_name
+    img = np.expand_dims(img, axis=0)
+    pred = model.predict(img)[0]
+    class_index = np.argmax(pred)
+    return class_names[class_index], pred[class_index]
 
-# Streamlit UI
-st.title("Real-time Note Recognition")
+st.title("💰 Nepali Currency Recognition")
 
-# Placeholder for displaying the camera feed
-frame_placeholder = st.empty()
+# Upload image
+uploaded_file = st.file_uploader("Upload a currency image", type=["jpg", "png", "jpeg"])
 
-# Main loop for real-time prediction
-cap = cv2.VideoCapture(0)
+# OR use webcam
+camera_image = st.camera_input("Or take a picture")
 
-# Adjust camera resolution if needed
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+image = None
 
-while cap.isOpened():
-    ret, frame = cap.read()  # Read a frame from the camera
-    if not ret:
-        break
+if uploaded_file:
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    image = cv2.imdecode(file_bytes, 1)
 
-    # Perform prediction on the frame
-    predicted_class = predict_class(frame)
+elif camera_image:
+    file_bytes = np.asarray(bytearray(camera_image.read()), dtype=np.uint8)
+    image = cv2.imdecode(file_bytes, 1)
 
-    # Speak out the recognized class
-    speak_class(predicted_class)
+if image is not None:
+    st.image(image, channels="BGR")
 
-    # Get the corresponding message based on the detected class
+    predicted_class, confidence = predict_class(image)
     message = class_messages.get(predicted_class, "Unknown")
 
-    # Display the predicted class and confidence on the frame
-    cv2.putText(frame, f'{predicted_class}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    cv2.putText(frame, f'Message: {message}', (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-    # Convert the frame to RGB format
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    # Display the frame in the Streamlit app
-    frame_placeholder.image(frame_rgb, channels='RGB')
-
-    # Delay to control frame rate and reduce processing load
-    cv2.waitKey(30)
-
-    # Break the loop if 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release the camera and close all OpenCV windows
-cap.release()
-cv2.destroyAllWindows()
+    st.success(f"Detected: {message}")
+    st.info(f"Confidence: {confidence:.2f}")
